@@ -579,3 +579,46 @@ Object.assign(window.topicDetails['cs602-u5'], {
         ]
     }
 });
+
+Object.assign(window.topicDetails['cs602-u2'], {
+    'cn-u2t4': {
+        title: 'Reference Books, RFCs & Exam-Ready Reading Map',
+        content: `
+<h3 class="text-2xl font-bold mb-4 text-blue-400">What to Read (Without Drowning)</h3>
+<p class="mb-4">Most students waste time hopping random YouTube playlists. Use a layered reading plan: one textbook for concepts, one reference for depth, and selected RFCs for protocol truth.</p>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+    <div class="bg-gray-800 p-5 rounded-xl border-t-4 border-cyan-500 shadow-lg hover:-translate-y-1 transition-transform duration-300">
+        <h4 class="text-cyan-300 font-bold mb-2">Core Textbooks</h4>
+        <ul class="list-disc pl-5 text-gray-300 text-sm space-y-2">
+            <li><strong>Kurose & Ross:</strong> Computer Networking: A Top-Down Approach</li>
+            <li><strong>Forouzan:</strong> Data Communications and Networking</li>
+            <li><strong>Tanenbaum:</strong> Computer Networks</li>
+        </ul>
+    </div>
+    <div class="bg-gray-800 p-5 rounded-xl border-t-4 border-emerald-500 shadow-lg hover:-translate-y-1 transition-transform duration-300">
+        <h4 class="text-emerald-300 font-bold mb-2">High-Value RFCs</h4>
+        <ul class="list-disc pl-5 text-gray-300 text-sm space-y-2">
+            <li><strong>RFC 791:</strong> IPv4 fundamentals</li>
+            <li><strong>RFC 793:</strong> TCP behavior basics</li>
+            <li><strong>RFC 8200:</strong> IPv6 specification</li>
+            <li><strong>RFC 1035:</strong> DNS implementation details</li>
+        </ul>
+    </div>
+</div>
+
+<div class="study-rail-block !p-4 mb-4">
+    <p class="metric-label">3-week revision strategy</p>
+    <p class="text-sm text-slate-400 mt-2">Week 1: OSI/IP/TCP-UDP/Subnetting. Week 2: Routing, DNS, HTTP, security protocols. Week 3: past-paper answers + Wireshark packet walkthroughs.</p>
+</div>
+        `,
+        quizzes: [
+            {
+                question: 'Which resource is most authoritative for protocol-level behavior when textbook explanations conflict?',
+                options: ['A) Random blog post', 'B) RFC specification', 'C) Social media thread', 'D) Slides without citations'],
+                answer: 1,
+                explanation: 'RFCs are canonical protocol specifications maintained through standardization bodies.'
+            }
+        ]
+    }
+});

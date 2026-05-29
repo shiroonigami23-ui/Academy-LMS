@@ -1,11 +1,13 @@
-let remoteProfile = null;
+﻿let remoteProfile = null;
 let socialDirectory = { directory: [], connections: [] };
 let activePeerId = '';
 let activeMessages = [];
 let currentStudentId = '';
 const MAX_PDF_BYTES = 10 * 1024 * 1024;
+const MAX_PPT_BYTES = 25 * 1024 * 1024;
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 let profileAutoSaveTimer = null;
+const AUTO_CHECK_PREFIX = '[AUTO_CHECK] ';
 
 function formatDate(value) {
     if (!value) return 'Not yet';
@@ -16,15 +18,29 @@ function formatDate(value) {
 }
 
 function formatBytes(bytes) {
-    if (!bytes) return '0 KB';
+    const parsed = Number(bytes);
+    if (!Number.isFinite(parsed) || parsed <= 0) return '0 KB';
     const units = ['B', 'KB', 'MB', 'GB'];
-    let value = bytes;
+    let value = parsed;
     let index = 0;
     while (value >= 1024 && index < units.length - 1) {
         value /= 1024;
         index += 1;
     }
     return `${value.toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
+}
+
+function splitDescriptionAndAutoCheck(rawDescription) {
+    const value = String(rawDescription || '');
+    const markerIndex = value.lastIndexOf(AUTO_CHECK_PREFIX);
+    if (markerIndex === -1) return { description: value, autoCheck: null };
+    const description = value.slice(0, markerIndex).trim();
+    const rawMeta = value.slice(markerIndex + AUTO_CHECK_PREFIX.length).trim();
+    try {
+        return { description, autoCheck: JSON.parse(rawMeta) };
+    } catch (_error) {
+        return { description: value, autoCheck: null };
+    }
 }
 
 function getStudentLabel() {
@@ -115,7 +131,7 @@ function renderProfilePage() {
                 ${remoteProfile ? `
                     <div class="study-rail-block !p-4">
                         <p class="metric-label">Quick snapshot</p>
-                        <p class="text-sm text-slate-400 mt-2">${remoteProfile.summary.completed_topics || 0} completed topics • ${remoteProfile.summary.attempts_count || 0} quiz attempts • ${remoteProfile.summary.connections_count || 0} study connections • ${remoteProfile.summary.direct_messages_count || 0} messages received</p>
+                        <p class="text-sm text-slate-400 mt-2">${remoteProfile.summary.completed_topics || 0} completed topics â€¢ ${remoteProfile.summary.attempts_count || 0} quiz attempts â€¢ ${remoteProfile.summary.connections_count || 0} study connections â€¢ ${remoteProfile.summary.direct_messages_count || 0} messages received</p>
                     </div>
                 ` : '<p class="text-sm text-slate-400">Your details are stored quietly as you study. Once the deployed app connects, this page fills itself in automatically.</p>'}
             </div>
@@ -152,31 +168,45 @@ function renderProfilePage() {
         <section class="panel-card p-5">
             <div class="section-head">
                 <h3>Study vault</h3>
-                <span>PDF upload for solved material</span>
+                <span>PDF/PPT upload for solved material</span>
             </div>
             <div class="space-y-4">
                 <div class="grid md:grid-cols-[1fr_1fr] gap-4">
                     <input id="pdfTitleInput" class="search-input" placeholder="Title, for example: CN unit 3 solved answers">
                     <input id="pdfDescriptionInput" class="search-input" placeholder="Short note or description">
                 </div>
-                <input id="pdfUploadInput" type="file" accept="application/pdf" class="search-input">
+                <input id="pdfUploadInput" type="file" accept="application/pdf,.pdf,application/vnd.ms-powerpoint,.ppt,application/vnd.openxmlformats-officedocument.presentationml.presentation,.pptx" class="search-input">
                 <div class="flex flex-wrap gap-3 items-center">
-                    <button id="uploadPdfBtn" class="primary-cta">Upload solved PDF</button>
-                    <span class="metric-subtext">PDF limit: 10 MB</span>
+                    <button id="uploadPdfBtn" class="primary-cta">Upload solved file</button>
+                    <span class="metric-subtext">PDF: 10 MB, PPT/PPTX: 25 MB</span>
                 </div>
                 <div class="space-y-3">
-                    ${uploads.length ? uploads.map((upload) => `
+                    ${uploads.length ? uploads.map((upload) => {
+                        const parsedMeta = splitDescriptionAndAutoCheck(upload.description);
+                        const autoCheck = parsedMeta.autoCheck;
+                        const autoCheckLabel = autoCheck && autoCheck.status
+                            ? (autoCheck.status === 'likely-correct'
+                                ? `Keyword check: likely correct (${autoCheck.score || 0}%)`
+                                : autoCheck.status === 'needs-review'
+                                    ? `Keyword check: needs review (${autoCheck.score || 0}%)`
+                                    : autoCheck.status === 'error'
+                                        ? 'Keyword check: unavailable'
+                                        : 'Keyword check: skipped')
+                            : '';
+                        return `
                         <article class="social-card">
                             <div class="flex flex-wrap items-center justify-between gap-3">
                                 <div>
                                     <strong class="text-white">${upload.title}</strong>
-                                    <p class="text-sm text-slate-400 mt-2">${upload.description || (upload.upload_kind === 'avatar' ? 'Profile image' : 'Solved study material')}</p>
+                                    <p class="text-sm text-slate-400 mt-2">${parsedMeta.description || (upload.upload_kind === 'avatar' ? 'Profile image' : 'Solved study material')}</p>
+                                    ${autoCheckLabel ? `<p class="text-xs text-cyan-300 mt-2">${autoCheckLabel}</p>` : ''}
                                     <p class="text-xs text-slate-500 mt-2">${formatBytes(upload.size_bytes)} • ${formatDate(upload.uploaded_at)}</p>
                                 </div>
                                 <a href="${upload.download_url || upload.blob_url}" target="_blank" rel="noreferrer" class="secondary-cta text-sm !py-2 !px-4">Open</a>
                             </div>
                         </article>
-                    `).join('') : '<p class="text-slate-400">No uploads yet. Add solved PDFs, answer sheets, or compact revision notes here.</p>'}
+                    `;
+                    }).join('') : '<p class="text-slate-400">No uploads yet. Add solved PDFs, answer sheets, or compact revision notes here.</p>'}
                 </div>
             </div>
         </section>
@@ -191,7 +221,7 @@ function renderProfilePage() {
             <div class="space-y-3">
                 ${recentTopics.length ? recentTopics.slice(0, 8).map((topic) => `
                     <a href="../index.html" class="continue-card block">
-                        <p class="metric-label">${topic.courseCode} • Unit ${topic.unitNumber}</p>
+                        <p class="metric-label">${topic.courseCode} â€¢ Unit ${topic.unitNumber}</p>
                         <h4 class="text-lg font-bold text-white mt-2">${topic.title}</h4>
                     </a>
                 `).join('') : '<p class="text-slate-400">Open a few topics from the curriculum and they will start appearing here.</p>'}
@@ -209,7 +239,7 @@ function renderProfilePage() {
                 ${sessions.length ? sessions.slice(0, 8).map((session) => `
                     <div class="study-rail-block !p-4">
                         <strong class="text-white">${session.courseLabel}</strong>
-                        <p class="text-sm text-slate-400 mt-2">${session.correct}/${session.total} correct • ${session.accuracy}% • ${session.mode}</p>
+                        <p class="text-sm text-slate-400 mt-2">${session.correct}/${session.total} correct â€¢ ${session.accuracy}% â€¢ ${session.mode}</p>
                         <p class="text-xs text-slate-500 mt-2">${formatDate(session.finishedAt)}</p>
                     </div>
                 `).join('') : '<p class="text-slate-400">No mock history yet. Complete a drill or timed mock from the tests page.</p>'}
@@ -513,8 +543,22 @@ async function uploadStudyPdf() {
     const input = document.getElementById('pdfUploadInput');
     const file = input && input.files ? input.files[0] : null;
     if (!file) return;
-    if (file.size > MAX_PDF_BYTES) {
+    const lowerName = String(file.name || '').toLowerCase();
+    const isPdf = file.type === 'application/pdf' || lowerName.endsWith('.pdf');
+    const isPpt = file.type === 'application/vnd.ms-powerpoint'
+        || file.type === 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+        || lowerName.endsWith('.ppt')
+        || lowerName.endsWith('.pptx');
+    if (!isPdf && !isPpt) {
+        alert('Upload only PDF, PPT, or PPTX.');
+        return;
+    }
+    if (isPdf && file.size > MAX_PDF_BYTES) {
         alert('Solved PDF must be 10 MB or smaller.');
+        return;
+    }
+    if (isPpt && file.size > MAX_PPT_BYTES) {
+        alert('Solved PPT/PPTX must be 25 MB or smaller.');
         return;
     }
 
@@ -559,3 +603,5 @@ document.addEventListener('DOMContentLoaded', async () => {
     currentStudentId = remoteProfile && remoteProfile.student ? remoteProfile.student.id : currentStudentId;
     renderProfilePage();
 });
+
+

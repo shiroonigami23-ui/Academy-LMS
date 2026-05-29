@@ -9,6 +9,7 @@
   "dependencies": {
     "@neondatabase/serverless": "^1.0.0",
     "@vercel/blob": "^2.4.0",
-    "google-auth-library": "^9.15.1"
+    "google-auth-library": "^9.15.1",
+    "pdf-parse": "^1.1.1"
   }
 }
